@@ -10,7 +10,7 @@ Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = ".nuget", ".nuget", "{0DC0DF
 		.nuget\NuGet.targets = .nuget\NuGet.targets
 	EndProjectSection
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "RedisAspNetProviders", "RedisAspNetProviders\RedisAspNetProviders.csproj", "{80536D35-80BA-4591-861D-0BBAC2BB6B65}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "RedisAspNetProviders", "src\RedisAspNetProviders\RedisAspNetProviders.csproj", "{80536D35-80BA-4591-861D-0BBAC2BB6B65}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
