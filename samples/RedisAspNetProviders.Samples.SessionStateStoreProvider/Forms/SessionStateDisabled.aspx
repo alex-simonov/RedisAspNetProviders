@@ -1,0 +1,1 @@
+﻿<%@ Page Title="" Language="C#" MasterPageFile="~/Forms/SessionStatePage.Master" AutoEventWireup="true" CodeBehind="SessionStateDisabled.aspx.cs" Inherits="RedisAspNetProviders.Samples.SessionStateStoreProvider.Forms.SessionStateDisabled" EnableSessionState="false" %>

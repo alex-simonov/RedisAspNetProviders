@@ -1,0 +1,33 @@
+﻿<%@ Master Language="C#" AutoEventWireup="true" CodeBehind="SessionStatePage.master.cs" Inherits="RedisAspNetProviders.Samples.SessionStateStoreProvider.Forms.SessionStatePage" %>
+
+<%@ Register Src="~/Forms/ModelControl.ascx" TagPrefix="uc1" TagName="Model" %>
+
+
+<!DOCTYPE html>
+
+<html xmlns="http://www.w3.org/1999/xhtml">
+    <head runat="server">
+        <title></title>
+        <meta charset="utf-8" />
+        <meta name="viewport" content="width=device-width" />
+    </head>
+    <body>
+        <form id="form1" runat="server">
+            <header>
+                <h1>RedisAspNetProviders Sample application</h1>
+                <h2>You are looking at @ViewBag.Title</h2>
+                <nav>
+                    <ul>
+                        <li><a href="<%= GetRouteUrl("MVC", new { controller = "RequiredSession", action = "Index" }) %>">MVC - SessionStateBehavior.Required</a></li>
+                        <li><a href="<%= GetRouteUrl("MVC", new { controller = "ReadOnlySession", action = "Index" }) %>">MVC - SessionStateBehavior.ReadOnly</a></li>
+                        <li><a href="<%= GetRouteUrl("MVC", new { controller = "DisabledSession", action = "Index" }) %>">MVC - SessionStateBehavior.Disabled</a></li>
+                        <li><a href="<%= GetRouteUrl("WebFormsSessionRequired", null) %>">WebForms - SessionStateBehavior.Required</a></li>
+                        <li><a href="<%= GetRouteUrl("WebFormsSessionReadOnly", null) %>">WebForms - SessionStateBehavior.ReadOnly</a></li>
+                        <li><a href="<%= GetRouteUrl("WebFormsSessionDisabled", null) %>">WebForms - SessionStateBehavior.Disabled</a></li>
+                    </ul>
+                </nav>
+            </header>
+            <uc1:Model runat="server" ID="ModelView" />
+        </form>
+    </body>
+</html>
