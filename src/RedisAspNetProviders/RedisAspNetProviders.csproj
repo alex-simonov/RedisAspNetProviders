@@ -9,7 +9,7 @@
     <AppDesignerFolder>Properties</AppDesignerFolder>
     <RootNamespace>RedisAspNetProviders</RootNamespace>
     <AssemblyName>RedisAspNetProviders</AssemblyName>
-    <TargetFrameworkVersion>v4.0</TargetFrameworkVersion>
+    <TargetFrameworkVersion>v4.5</TargetFrameworkVersion>
     <FileAlignment>512</FileAlignment>
     <SolutionDir Condition="$(SolutionDir) == '' Or $(SolutionDir) == '*Undefined*'">..\..\..\RedisAspNetProviders\</SolutionDir>
     <RestorePackages>true</RestorePackages>
@@ -36,9 +36,9 @@
     <Prefer32Bit>false</Prefer32Bit>
   </PropertyGroup>
   <ItemGroup>
-    <Reference Include="BookSleeve, Version=1.3.41.0, Culture=neutral, PublicKeyToken=9056fda458ff61cf, processorArchitecture=MSIL">
+    <Reference Include="StackExchange.Redis, Version=1.0.247.0, Culture=neutral, processorArchitecture=MSIL">
       <SpecificVersion>False</SpecificVersion>
-      <HintPath>..\..\packages\BookSleeve.1.3.41\lib\BookSleeve.dll</HintPath>
+      <HintPath>..\..\packages\StackExchange.Redis.1.0.247\lib\StackExchange.Redis.dll</HintPath>
     </Reference>
     <Reference Include="System" />
     <Reference Include="System.Configuration" />
@@ -50,10 +50,8 @@
   <ItemGroup>
     <Compile Include="OutputCacheProvider.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
-    <Compile Include="RedisConnectionGateway.cs" />
-    <Compile Include="RedisConnectionSettings.cs" />
     <Compile Include="SessionStateStoreProvider.cs" />
-    <Compile Include="Utils.cs" />
+    <Compile Include="InitializationUtils.cs" />
   </ItemGroup>
   <ItemGroup>
     <None Include="packages.config" />

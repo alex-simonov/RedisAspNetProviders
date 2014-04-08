@@ -1,16 +1,15 @@
 ﻿using System.Reflection;
-using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
 
 // General Information about an assembly is controlled through the following 
 // set of attributes. Change these attribute values to modify the information
 // associated with an assembly.
 
-[assembly: AssemblyTitle("RedisAspNetProviders")]
-[assembly: AssemblyDescription("Redis based ASP.NET providers using StackExchange.Redis")]
+[assembly: AssemblyTitle("RedisAspNetProviders.Tests")]
+[assembly: AssemblyDescription("")]
 [assembly: AssemblyConfiguration("")]
 [assembly: AssemblyCompany("")]
-[assembly: AssemblyProduct("RedisAspNetProviders")]
+[assembly: AssemblyProduct("RedisAspNetProviders.Tests")]
 [assembly: AssemblyCopyright("Copyright © Alexander Simonov 2014")]
 [assembly: AssemblyTrademark("")]
 [assembly: AssemblyCulture("")]
@@ -23,7 +22,7 @@ using System.Runtime.InteropServices;
 
 // The following GUID is for the ID of the typelib if this project is exposed to COM
 
-[assembly: Guid("3158ba00-52ae-4eaf-80cf-d0a3ac53e368")]
+[assembly: Guid("2292b460-8c85-4302-b390-e5f412ba7a70")]
 
 // Version information for an assembly consists of the following four values:
 //
@@ -38,4 +37,3 @@ using System.Runtime.InteropServices;
 
 [assembly: AssemblyVersion("1.0.0.0")]
 [assembly: AssemblyFileVersion("1.0.0.0")]
-[assembly: InternalsVisibleTo("RedisAspNetProviders.Tests")]

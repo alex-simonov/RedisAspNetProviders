@@ -1,0 +1,1 @@
+﻿<%@ Application Codebehind="Global.asax.cs" Inherits="RedisAspNetProviders.Samples.SessionStateStoreProvider.Global" Language="C#" %>

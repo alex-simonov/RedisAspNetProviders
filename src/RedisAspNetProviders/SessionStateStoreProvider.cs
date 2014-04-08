@@ -2,24 +2,26 @@
 using System.Collections.Generic;
 using System.Collections.Specialized;
 using System.Configuration;
+using System.Configuration.Provider;
 using System.Globalization;
 using System.IO;
 using System.Web;
 using System.Web.Configuration;
 using System.Web.SessionState;
-using BookSleeve;
+using StackExchange.Redis;
 
 namespace RedisAspNetProviders
 {
     public class SessionStateStoreProvider : SessionStateStoreProviderBase
     {
-        static readonly object s_oneTimeInitLock = new object();
-        static bool s_oneTimeInitCalled;
+        private const string LockStartDateTimeFormat = "dd'-'MM'-'yyyy'T'HH':'mm':'ss'.'fffffff";
+        private static readonly object s_oneTimeInitLock = new object();
+        private static bool s_oneTimeInitCalled;
 
-        static RedisConnectionGateway s_redisConnectionGateway;
-        static int s_db;
-        static string s_keyPrefix;
-        static int s_sessionTimeoutInSeconds;
+        protected static ConnectionMultiplexer ConnectionMultiplexer { get; private set; }
+        protected static int DbNumber { get; private set; }
+        protected static string KeyPrefix { get; private set; }
+        protected static TimeSpan SessionTimeout { get; private set; }
 
         public override void Initialize(string name, NameValueCollection config)
         {
@@ -43,81 +45,70 @@ namespace RedisAspNetProviders
             }
         }
 
-        protected virtual void OneTimeInit(NameValueCollection config)
+        private static void OneTimeInit(NameValueCollection config)
         {
-            s_keyPrefix = config["keyPrefix"] ?? string.Empty;
+            ConnectionMultiplexer = InitializationUtils.GetConnectionMultiplexer(config);
             try
             {
-                var redisConnectionSettings = RedisConnectionSettings.Parse(config);
-                s_redisConnectionGateway = new RedisConnectionGateway(redisConnectionSettings);
-            }
-            catch (ArgumentException aex)
-            {
-                throw new ConfigurationErrorsException("SessionStateStoreProvider configuration error: " + aex.Message, aex);
-            }
-            try
-            {
-                s_db = Utils.ParseInt(config["dbNumber"], NumberStyles.AllowLeadingWhite | NumberStyles.AllowTrailingWhite, 0);
+                DbNumber = InitializationUtils.ParseInt(config["dbNumber"],
+                    NumberStyles.AllowLeadingWhite | NumberStyles.AllowTrailingWhite, 0);
             }
             catch (Exception ex)
             {
-                throw new ConfigurationErrorsException("SessionStateStoreProvider configuration error: Can not parse db number.", ex);
+                throw new ConfigurationErrorsException("Can not parse db number.", ex);
             }
+            KeyPrefix = config["keyPrefix"] ?? string.Empty;
 
-            var sessionStateConfigSection = (SessionStateSection)WebConfigurationManager.GetSection("system.web/sessionState");
-            s_sessionTimeoutInSeconds = (int)sessionStateConfigSection.Timeout.TotalSeconds;
+            var sessionStateConfig = (SessionStateSection)WebConfigurationManager.GetSection("system.web/sessionState");
+            SessionTimeout = sessionStateConfig.Timeout;
         }
 
-
-        /// <summary>
-        /// Get Redis key for session state data stored by key
-        /// </summary>
-        /// <param name="context"></param>
-        /// <param name="id"></param>
-        /// <returns></returns>
-        protected virtual string GetRedisKey(HttpContext context, string id)
+        protected virtual Tuple<IDatabase, RedisKey> GetSessionStateStorageDetails(HttpContext context, string id)
         {
-            return s_keyPrefix + id;
+            return new Tuple<IDatabase, RedisKey>(
+                ConnectionMultiplexer.GetDatabase(DbNumber),
+                KeyPrefix + id);
         }
 
-        /// <summary>
-        /// Serialize a content of SessionStateItemCollection to array of bytes
-        /// </summary>
-        /// <param name="sessionStateItems"></param>
-        /// <returns></returns>
-        protected virtual byte[] SerializeSessionStateItemCollection(SessionStateItemCollection sessionStateItems)
+        protected static string GenerateNewLockId()
+        {
+            return string.Format(
+                "{0}|{1}",
+                Guid.NewGuid().ToString("N", CultureInfo.InvariantCulture),
+                DateTime.UtcNow.ToString(LockStartDateTimeFormat, CultureInfo.InvariantCulture));
+        }
+
+        protected static TimeSpan GetLockAge(string lockIdString)
+        {
+            int lockDateTimeStartIndex = lockIdString.IndexOf('|');
+            DateTime lockDateTime = DateTime.ParseExact(
+                lockIdString.Substring(lockDateTimeStartIndex + 1),
+                LockStartDateTimeFormat,
+                CultureInfo.InvariantCulture,
+                DateTimeStyles.AssumeUniversal | DateTimeStyles.AdjustToUniversal);
+            return DateTime.UtcNow.Subtract(lockDateTime);
+        }
+
+        protected virtual byte[] SerializeSessionState(SessionStateItemCollection sessionStateItems)
         {
             using (var ms = new MemoryStream())
             using (var bw = new BinaryWriter(ms))
             {
                 sessionStateItems.Serialize(bw);
-                bw.Flush();
                 return ms.ToArray();
             }
         }
 
-        /// <summary>
-        /// Deserialize a content of SessionStateItemCollection from array of bytes
-        /// </summary>
-        /// <param name="bytes"></param>
-        /// <returns></returns>
-        protected virtual SessionStateItemCollection DeserializeSessionStateItemCollection(byte[] bytes)
+        protected virtual SessionStateItemCollection DeserializeSessionState(byte[] bytes)
         {
             using (var ms = new MemoryStream(bytes))
             using (var br = new BinaryReader(ms))
             {
-                var result = SessionStateItemCollection.Deserialize(br);
+                SessionStateItemCollection result = SessionStateItemCollection.Deserialize(br);
                 return result;
             }
         }
 
-        /// <summary>
-        /// Create a brand new SessionStateStoreData. The created SessionStateStoreData must have
-        /// a non-null ISessionStateItemCollection.
-        /// </summary>
-        /// <param name="context"></param>
-        /// <param name="timeout"></param>
-        /// <returns></returns>
         public override SessionStateStoreData CreateNewStoreData(HttpContext context, int timeout)
         {
             return new SessionStateStoreData(
@@ -126,30 +117,34 @@ namespace RedisAspNetProviders
                 timeout);
         }
 
-        /// <summary>
-        /// 
-        /// </summary>
-        /// <param name="context"></param>
-        /// <param name="id"></param>
-        /// <param name="timeout"></param>
         public override void CreateUninitializedItem(HttpContext context, string id, int timeout)
         {
-            string key = GetRedisKey(context, id);
-            RedisConnection redis = s_redisConnectionGateway.GetConnection();
-            redis.Keys.Remove(s_db, key);
-            redis.Hashes.Set(s_db, key, new Dictionary<string, byte[]>(2)
-            {
-                { "init", new byte[1] { 0x00 } },
-                { "data", SerializeSessionStateItemCollection(new SessionStateItemCollection()) }
-            });
-            redis.Keys.Expire(s_db, key, (int)TimeSpan.FromMinutes(timeout).TotalSeconds);
+            byte[] sessionStateBytes = SerializeSessionState(new SessionStateItemCollection());
+
+            Tuple<IDatabase, RedisKey> storageDetails = GetSessionStateStorageDetails(context, id);
+            IDatabase redis = storageDetails.Item1;
+            RedisKey key = storageDetails.Item2;
+
+            redis.ScriptEvaluate(
+                @"redis.call('DEL', KEYS[1])
+                  redis.call('HMSET', KEYS[1], ARGV[2], ARGV[3], ARGV[4], ARGV[5])
+                  redis.call('EXPIRE', KEYS[1], ARGV[1])",
+                new RedisKey[] { key },
+                new RedisValue[]
+                {
+                    (long)TimeSpan.FromMinutes(timeout).TotalSeconds,
+                    HashFieldsEnum.SessionStateData,
+                    sessionStateBytes,
+                    HashFieldsEnum.InitializeItemFlag,
+                    1
+                });
         }
 
         public override void Dispose()
-        { }
+        {}
 
         public override void EndRequest(HttpContext context)
-        { }
+        {}
 
         public override SessionStateStoreData GetItem(HttpContext context, string id, out bool locked,
             out TimeSpan lockAge, out object lockId, out SessionStateActions actions)
@@ -166,32 +161,167 @@ namespace RedisAspNetProviders
         protected virtual SessionStateStoreData GetItem(bool exclusive, HttpContext context, string id, out bool locked,
             out TimeSpan lockAge, out object lockId, out SessionStateActions actions)
         {
-            throw new NotImplementedException();
+            locked = false;
+            lockAge = TimeSpan.Zero;
+            lockId = null;
+            actions = SessionStateActions.None;
+
+            Tuple<IDatabase, RedisKey> storageDetails = GetSessionStateStorageDetails(context, id);
+            IDatabase redis = storageDetails.Item1;
+            RedisKey key = storageDetails.Item2;
+
+            var arguments = new List<RedisValue>(5)
+            {
+                (long)SessionTimeout.TotalSeconds,
+                HashFieldsEnum.SessionStateData,
+                HashFieldsEnum.Lock,
+                HashFieldsEnum.InitializeItemFlag
+            };
+            if (exclusive)
+            {
+                arguments.Add(GenerateNewLockId());
+            }
+
+            var result = (RedisValue[])redis.ScriptEvaluate(
+                @"redis.call('EXPIRE', KEYS[1], ARGV[1])
+                  local session = redis.call('HMGET', KEYS[1], ARGV[2], ARGV[3], ARGV[4])
+                  if not session[1] then 
+                      return { false }
+                  elseif session[2] then
+                      return { false, session[2] }
+                  end
+                  if ARGV[5] ~= nil then
+                      redis.call('HSET', KEYS[1], ARGV[3], ARGV[5])
+                      session[2] = ARGV[5]
+                  end
+                  local initFlagSet = not not session[3]
+                  if initFlagSet then
+                      redis.call('HDEL', KEYS[1], ARGV[4])
+                  end
+                  return { session[1], session[2], initFlagSet }",
+                new RedisKey[] { key },
+                arguments.ToArray());
+
+            switch (result.Length)
+            {
+                case 1: // session is not found
+                    return null;
+
+                case 2: // session is locked by someone else
+                    locked = true;
+                    lockId = (string)result[1];
+                    lockAge = GetLockAge((string)lockId);
+                    return null;
+
+                case 3: // got session. 
+                    if (exclusive)
+                    {
+                        lockId = (string)result[1];
+                    }
+                    if ((bool)result[2])
+                    {
+                        actions = SessionStateActions.InitializeItem;
+                    }
+                    return new SessionStateStoreData(
+                        DeserializeSessionState(result[0]),
+                        SessionStateUtility.GetSessionStaticObjects(context),
+                        (int)SessionTimeout.TotalMinutes);
+
+                default:
+                    throw new ProviderException("Invalid count of items in result array.");
+            }
         }
 
         public override void InitializeRequest(HttpContext context)
-        { }
+        {}
 
         public override void ReleaseItemExclusive(HttpContext context, string id, object lockId)
         {
-            throw new NotImplementedException();
+            Tuple<IDatabase, RedisKey> storageDetails = GetSessionStateStorageDetails(context, id);
+            IDatabase redis = storageDetails.Item1;
+            RedisKey key = storageDetails.Item2;
+
+            redis.ScriptEvaluate(
+                @"redis.call('EXPIRE', KEYS[1], ARGV[1])
+                  if redis.call('HGET', KEYS[1], ARGV[2]) == ARGV[3] then
+                      redis.call('HDEL', KEYS[1], ARGV[2])
+                  end",
+                new RedisKey[] { key },
+                new RedisValue[]
+                {
+                    (long)SessionTimeout.TotalSeconds,
+                    HashFieldsEnum.Lock,
+                    (string)lockId
+                });
         }
 
         public override void RemoveItem(HttpContext context, string id, object lockId, SessionStateStoreData item)
         {
-            throw new NotImplementedException();
+            if (lockId == null) return;
+            Tuple<IDatabase, RedisKey> storageDetails = GetSessionStateStorageDetails(context, id);
+            IDatabase redis = storageDetails.Item1;
+            RedisKey key = storageDetails.Item2;
+
+            redis.ScriptEvaluate(
+                @"local lockId = redis.call('HGET', KEYS[1], ARGV[1])
+                  if (ARGV[2] == nil and not lockId) or (ARGV[2] ~= nil and lockId == ARGV[2]) then
+                      redis.call('DEL', KEYS[1])
+                  end",
+                new RedisKey[] { key },
+                new RedisValue[]
+                {
+                    HashFieldsEnum.Lock,
+                    (string)lockId
+                });
         }
 
         public override void ResetItemTimeout(HttpContext context, string id)
         {
-            string key = GetRedisKey(context, id);
-            var redis = s_redisConnectionGateway.GetConnection();
-            redis.Wait(redis.Keys.Expire(s_db, key, s_sessionTimeoutInSeconds));
+            Tuple<IDatabase, RedisKey> storageDetails = GetSessionStateStorageDetails(context, id);
+            IDatabase redis = storageDetails.Item1;
+            RedisKey key = storageDetails.Item2;
+
+            redis.KeyExpire(key, SessionTimeout);
         }
 
-        public override void SetAndReleaseItemExclusive(HttpContext context, string id, SessionStateStoreData item, object lockId, bool newItem)
+        public override void SetAndReleaseItemExclusive(HttpContext context, string id, SessionStateStoreData item,
+            object lockId, bool newItem)
         {
-            throw new NotImplementedException();
+            if (lockId == null && !newItem) return;
+
+            Tuple<IDatabase, RedisKey> storageDetails = GetSessionStateStorageDetails(context, id);
+            IDatabase redis = storageDetails.Item1;
+            RedisKey key = storageDetails.Item2;
+
+            byte[] sessionStateData = SerializeSessionState((SessionStateItemCollection)item.Items);
+
+            var arguments = new List<RedisValue>(6)
+            {
+                HashFieldsEnum.SessionStateData,
+                sessionStateData,
+                (long)SessionTimeout.TotalSeconds,
+                newItem,
+                HashFieldsEnum.Lock,
+            };
+            if (lockId != null)
+            {
+                arguments.Add((string)lockId);
+            }
+            redis.ScriptEvaluate(
+                @"local canUpdateSession = true
+                  if tonumber(ARGV[4]) == 1 then
+                      redis.call('DEL', KEYS[1])
+                  elseif ARGV[6] ~= nil and ARGV[6] == redis.call('HGET', KEYS[1], ARGV[5]) then
+                      redis.call('HDEL', KEYS[1], ARGV[5])
+                  else
+                      canUpdateSession = false
+                  end
+                  if canUpdateSession then
+                      redis.call('HSET', KEYS[1], ARGV[1], ARGV[2])
+                      redis.call('EXPIRE', KEYS[1], ARGV[3])
+                  end",
+                new RedisKey[] { key },
+                arguments.ToArray());
         }
 
         public override bool SetItemExpireCallback(SessionStateItemExpireCallback expireCallback)
@@ -199,5 +329,16 @@ namespace RedisAspNetProviders
             return false;
         }
 
+        protected static class HashFieldsEnum
+        {
+            /// <summary>"init"</summary>
+            public const string InitializeItemFlag = "init";
+
+            /// <summary>"data"</summary>
+            public const string SessionStateData = "data";
+
+            /// <summary>"lock"</summary>
+            public const string Lock = "lock";
+        }
     }
 }

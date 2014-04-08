@@ -1,0 +1,42 @@
+﻿@model RedisAspNetProviders.Samples.SessionStateStoreProvider.Models.Model
+@{
+    Layout = null;
+}
+<!DOCTYPE html>
+<html>
+    <head>
+        <meta charset="utf-8" />
+        <meta name="viewport" content="width=device-width" />
+        <title>@ViewBag.Title - RedisAspNetProviders Sample application</title>
+    </head>
+    <body>
+        <header>
+            <h1>RedisAspNetProviders Sample application</h1>
+            <h2>You are looking at @ViewBag.Title</h2>
+            <nav>
+                <ul>
+                    <li>@Html.ActionLink("MVC - SessionStateBehavior.Required", "Index", "RequiredSession")</li>
+                    <li>@Html.ActionLink("MVC - SessionStateBehavior.ReadOnly", "Index", "ReadOnlySession")</li>
+                    <li>@Html.ActionLink("MVC - SessionStateBehavior.Disabled", "Index", "DisabledSession")</li>
+                    <li>@Html.RouteLink("WebForms - SessionStateBehavior.Required", "WebFormsSessionRequired")</li>
+                    <li>@Html.RouteLink("WebForms - SessionStateBehavior.ReadOnly", "WebFormsSessionReadOnly")</li>
+                    <li>@Html.RouteLink("WebForms - SessionStateBehavior.Disabled", "WebFormsSessionDisabled")</li>
+                </ul>
+            </nav>
+        </header>
+        @if (Model == null)
+        {
+            <p>Session is unavailable</p>
+        }
+        else
+        {
+            @Html.DisplayForModel()
+        }
+        <ul>
+            <li>@Html.ActionLink("Refresh Page", "Index")</li>
+            <li>@Html.ActionLink("Set DateTime.Now to Session", "SetDateTimeNowToSession")</li>
+            <li>@Html.ActionLink("Clear Session", "ClearSession")</li>
+            <li>@Html.ActionLink("Abandon Session", "AbandonSession")</li>
+        </ul>
+    </body>
+</html>
