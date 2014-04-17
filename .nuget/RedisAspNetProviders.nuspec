@@ -1,0 +1,42 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<package xmlns="http://schemas.microsoft.com/packaging/2012/06/nuspec.xsd">
+    <metadata>
+        <id>RedisAspNetProviders</id>
+        <version>1.0.1</version>
+        <title>RedisAspNetProviders</title>
+        <authors>alex-simonov</authors>
+        <owners>alex-simonov</owners>
+        <licenseUrl>https://raw.githubusercontent.com/alex-simonov/RedisAspNetProviders/master/LICENSE</licenseUrl>
+        <projectUrl>https://github.com/alex-simonov/RedisAspNetProviders</projectUrl>
+        <requireLicenseAcceptance>true</requireLicenseAcceptance>
+        <description>Redis backed ASP.NET providers written in C# using StackExchange.Redis. Includes  OutputCacheProvider and SessionStateStoreProvider.</description>
+        <summary>Redis backed ASP.NET providers written in C# using StackExchange.Redis. Includes  OutputCacheProvider and SessionStateStoreProvider.</summary>
+        <releaseNotes>v 1.0.1:
+ - Supports .NET 4.0 and higher;
+ - Updated StackExchange.Redis dependency.
+
+v 1.0.0: 
+ - Supports .NET 4.5 and higher;
+ - Requires Redis 2.6.0 or later;
+ - Implemented SessionStateStoreProvider;
+ - Implemented OutputCacheProvider.</releaseNotes>
+        <tags>asp.net AspNet provider redis sessionstate session outputcache cache</tags>
+        <dependencies>
+            <group targetFramework=".NETFramework4.5">
+                <dependency id="StackExchange.Redis" version="1.0.270" />
+            </group>
+            <group targetFramework=".NETFramework4.0">
+                <dependency id="Microsoft.Bcl.Build" version="1.0.14" />
+                <dependency id="Microsoft.Bcl" version="1.1.8" />
+                <dependency id="Microsoft.Bcl.Async" version="1.0.168" />
+                <dependency id="StackExchange.Redis" version="1.0.270" />
+            </group>
+        </dependencies>
+    </metadata>
+    <files>
+        <file src="..\src\RedisAspNetProviders_net40\Release\RedisAspNetProviders.dll" target="lib\net40\RedisAspNetProviders.dll" />
+        <file src="..\src\RedisAspNetProviders_net40\Release\RedisAspNetProviders.pdb" target="lib\net40\RedisAspNetProviders.pdb" />
+        <file src="..\src\RedisAspNetProviders\Release\RedisAspNetProviders.dll" target="lib\net45\RedisAspNetProviders.dll" />
+        <file src="..\src\RedisAspNetProviders\Release\RedisAspNetProviders.pdb" target="lib\net45\RedisAspNetProviders.pdb" />
+    </files>
+</package>

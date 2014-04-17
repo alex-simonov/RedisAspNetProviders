@@ -8,6 +8,7 @@ Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = ".nuget", ".nuget", "{0DC0DF
 		.nuget\NuGet.Config = .nuget\NuGet.Config
 		.nuget\NuGet.exe = .nuget\NuGet.exe
 		.nuget\NuGet.targets = .nuget\NuGet.targets
+		.nuget\RedisAspNetProviders.nuspec = .nuget\RedisAspNetProviders.nuspec
 	EndProjectSection
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "RedisAspNetProviders", "src\RedisAspNetProviders\RedisAspNetProviders.csproj", "{80536D35-80BA-4591-861D-0BBAC2BB6B65}"
@@ -21,6 +22,8 @@ EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "RedisAspNetProviders.Samples.SessionStateStoreProvider", "samples\RedisAspNetProviders.Samples.SessionStateStoreProvider\RedisAspNetProviders.Samples.SessionStateStoreProvider.csproj", "{4C4A0CF2-478C-44F8-A816-A0859641BB2C}"
 EndProject
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "samples", "samples", "{3F75A3EA-181B-4CE6-89F9-BB76FE2408FC}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "RedisAspNetProviders_net40", "src\RedisAspNetProviders_net40\RedisAspNetProviders_net40.csproj", "{D570833F-8DB8-420E-898E-5AEFBE5C0E98}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
@@ -40,12 +43,17 @@ Global
 		{4C4A0CF2-478C-44F8-A816-A0859641BB2C}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{4C4A0CF2-478C-44F8-A816-A0859641BB2C}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{4C4A0CF2-478C-44F8-A816-A0859641BB2C}.Release|Any CPU.Build.0 = Release|Any CPU
+		{D570833F-8DB8-420E-898E-5AEFBE5C0E98}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{D570833F-8DB8-420E-898E-5AEFBE5C0E98}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{D570833F-8DB8-420E-898E-5AEFBE5C0E98}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{D570833F-8DB8-420E-898E-5AEFBE5C0E98}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
 	EndGlobalSection
 	GlobalSection(NestedProjects) = preSolution
 		{80536D35-80BA-4591-861D-0BBAC2BB6B65} = {D4E243F4-A9F8-4935-9F4F-9F6FC463AE2E}
+		{D570833F-8DB8-420E-898E-5AEFBE5C0E98} = {D4E243F4-A9F8-4935-9F4F-9F6FC463AE2E}
 		{A9E6B093-A3D7-4F84-B9C7-8B2A1FFE0454} = {18DB160F-216F-4A2B-83E5-0EF52FCAAAEF}
 		{4C4A0CF2-478C-44F8-A816-A0859641BB2C} = {3F75A3EA-181B-4CE6-89F9-BB76FE2408FC}
 	EndGlobalSection
