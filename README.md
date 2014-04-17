@@ -7,7 +7,7 @@ Redis backed ASP.NET providers written in C# using [`StackExchange.Redis`](https
 
 To use `RedisAspNetProviders` in your project it must meet the following requirements:
 
-1. .NET 4.0 or later (`StackExchange.Redis` is compiled for .NET 4.5).
+1. .NET 4.0 or later.
 2. Redis 2.6.0 or later.
 
 To build `RedisAspNetProviders` you will need Visual Studio 2013.
