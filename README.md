@@ -1,13 +1,13 @@
 RedisAspNetProviders
 ====================
 
-Redis backed ASP.NET providers written in C# using [`StackExchange.Redis`](https://github.com/StackExchange/StackExchange.Redis). Currently includes the following providers:
+Redis backed ASP.NET providers written in C# using [`StackExchange.Redis`](https://github.com/StackExchange/StackExchange.Redis). Includes the following providers:
 * `OutputCacheProvider`;
 * `SessionStateStoreProvider`.
 
 To use `RedisAspNetProviders` in your project it must meet the following requirements:
 
-1. .NET 4.5 or later (`StackExchange.Redis` is compiled for .NET 4.5).
+1. .NET 4.0 or later (`StackExchange.Redis` is compiled for .NET 4.5).
 2. Redis 2.6.0 or later.
 
 To build `RedisAspNetProviders` you will need Visual Studio 2013.
@@ -15,10 +15,10 @@ To build `RedisAspNetProviders` you will need Visual Studio 2013.
 
 Installation
 --------------------
-1. `RedisAspNetProviders` can be installed via the nuget UI ([RedisAspNetProviders](https://www.nuget.org/packages/RedisAspNetProviders)) or via the nuget package manager console:
+1. `RedisAspNetProviders` can be installed via the nuget UI (as [RedisAspNetProviders](https://www.nuget.org/packages/RedisAspNetProviders)) or via the nuget package manager console:
 
         PM> Install-Package RedisAspNetProviders
-2. Alternatively, you can grab sources from here and build or add a reference to the `RedisAspNetProviders` project.
+2. Alternatively, you can grab sources from here and build.
 
 Configure connection to Redis:
 --------------------
