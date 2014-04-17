@@ -34,9 +34,9 @@ v 1.0.0:
         </dependencies>
     </metadata>
     <files>
-        <file src="..\src\RedisAspNetProviders_net40\Release\RedisAspNetProviders.dll" target="lib\net40\RedisAspNetProviders.dll" />
-        <file src="..\src\RedisAspNetProviders_net40\Release\RedisAspNetProviders.pdb" target="lib\net40\RedisAspNetProviders.pdb" />
-        <file src="..\src\RedisAspNetProviders\Release\RedisAspNetProviders.dll" target="lib\net45\RedisAspNetProviders.dll" />
-        <file src="..\src\RedisAspNetProviders\Release\RedisAspNetProviders.pdb" target="lib\net45\RedisAspNetProviders.pdb" />
+        <file src="..\src\RedisAspNetProviders_net40\bin\Release\RedisAspNetProviders.dll" target="lib\net40\RedisAspNetProviders.dll" />
+        <file src="..\src\RedisAspNetProviders_net40\bin\Release\RedisAspNetProviders.pdb" target="lib\net40\RedisAspNetProviders.pdb" />
+        <file src="..\src\RedisAspNetProviders\bin\Release\RedisAspNetProviders.dll" target="lib\net45\RedisAspNetProviders.dll" />
+        <file src="..\src\RedisAspNetProviders\bin\Release\RedisAspNetProviders.pdb" target="lib\net45\RedisAspNetProviders.pdb" />
     </files>
 </package>
