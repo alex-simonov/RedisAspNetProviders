@@ -26,7 +26,7 @@ Add a connection string for Redis and specify the `connectionStringName` for pro
 
 ```xml
 <connectionStrings>
-  <add name="RedisConnectionString" connectionString="192.168.0.120,connectionTimeout=10" />
+  <add name="RedisConnectionString" connectionString="192.168.0.120,connectTimeout=5000" />
 </connectionStrings>
 <system.web>
   ...
@@ -60,7 +60,7 @@ Add a connection string for Redis and specify the `connectionStringName` for pro
     <providers>
       <add name="RedisSessionStateStoreProvider"
            type="RedisAspNetProviders.SessionStateStoreProvider, RedisAspNetProviders"
-           connectionString="192.168.0.120,connectionTimeout=10" />
+           connectionString="192.168.0.120,connectTimeout=10000" />
     </providers>
   </sessionState>
   ...
@@ -69,7 +69,7 @@ Add a connection string for Redis and specify the `connectionStringName` for pro
       <providers>
         <add name="RedisOutputCacheProvider"
              type="RedisAspNetProviders.OutputCacheProvider, RedisAspNetProviders"
-             connectionString="192.168.0.121,connectionTimeout=10" />
+             connectionString="192.168.0.121,connectTimeout=10000" />
       </providers>
     </outputCache>
   </caching>
