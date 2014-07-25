@@ -92,7 +92,7 @@ All providers support several optional parameters:
     <providers>
       <add name="RedisSessionStateStoreProvider"
            type="RedisAspNetProviders.SessionStateStoreProvider, RedisAspNetProviders"
-           connectionString="192.168.0.120,connectionTimeout=10"
+           connectionString="192.168.0.120:6379"
            dbNumber="1"
            keyPrefix="MyWebApplication/SessionState/" />
     </providers>
@@ -103,7 +103,7 @@ All providers support several optional parameters:
       <providers>
         <add name="RedisOutputCacheProvider"
              type="RedisAspNetProviders.OutputCacheProvider, RedisAspNetProviders"
-             connectionString="192.168.0.121,connectionTimeout=10"
+             connectionString="192.168.0.121:6379,connectTimeout=10000"
              dbNumber="1"
              keyPrefix="MyWebApplication/OutputCache/" />
       </providers>
