@@ -17,7 +17,7 @@ namespace RedisAspNetProviders.Tests
             var provider = new T();
             provider.Initialize("", new NameValueCollection
             {
-                { "connectionString", "192.168.0.195:6379,connectionTimeout=10000" }
+                { "connectionString", "192.168.0.195:6379,connectTimeout=10000" }
             });
             return provider;
         }
