@@ -1,13 +1,14 @@
 ﻿
 Microsoft Visual Studio Solution File, Format Version 12.00
 # Visual Studio 2013
-VisualStudioVersion = 12.0.30110.0
+VisualStudioVersion = 12.0.31101.0
 MinimumVisualStudioVersion = 10.0.40219.1
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = ".nuget", ".nuget", "{0DC0DFF3-253F-4982-B8E6-D35B6DA2CBA6}"
 	ProjectSection(SolutionItems) = preProject
 		.nuget\NuGet.Config = .nuget\NuGet.Config
 		.nuget\NuGet.exe = .nuget\NuGet.exe
 		.nuget\NuGet.targets = .nuget\NuGet.targets
+		.nuget\packages.config = .nuget\packages.config
 		.nuget\RedisAspNetProviders.nuspec = .nuget\RedisAspNetProviders.nuspec
 	EndProjectSection
 EndProject
@@ -27,6 +28,7 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "RedisAspNetProviders_net40"
 EndProject
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Solution Items", "Solution Items", "{0CF73303-884B-4101-B9E4-DA6B0EA60C48}"
 	ProjectSection(SolutionItems) = preProject
+		appveyor.yml = appveyor.yml
 		README.md = README.md
 	EndProjectSection
 EndProject
@@ -58,8 +60,8 @@ Global
 	EndGlobalSection
 	GlobalSection(NestedProjects) = preSolution
 		{80536D35-80BA-4591-861D-0BBAC2BB6B65} = {D4E243F4-A9F8-4935-9F4F-9F6FC463AE2E}
-		{D570833F-8DB8-420E-898E-5AEFBE5C0E98} = {D4E243F4-A9F8-4935-9F4F-9F6FC463AE2E}
 		{A9E6B093-A3D7-4F84-B9C7-8B2A1FFE0454} = {18DB160F-216F-4A2B-83E5-0EF52FCAAAEF}
 		{4C4A0CF2-478C-44F8-A816-A0859641BB2C} = {3F75A3EA-181B-4CE6-89F9-BB76FE2408FC}
+		{D570833F-8DB8-420E-898E-5AEFBE5C0E98} = {D4E243F4-A9F8-4935-9F4F-9F6FC463AE2E}
 	EndGlobalSection
 EndGlobal

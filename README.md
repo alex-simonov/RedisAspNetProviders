@@ -10,7 +10,8 @@ To use `RedisAspNetProviders` in your project it must meet the following require
 1. .NET 4.0 or later.
 2. Redis 2.6.0 or later.
 
-To build `RedisAspNetProviders` you will need Visual Studio 2013.
+To build `RedisAspNetProviders` and run tests you will need:
+1. Visual Studio 2013.
 
 
 Installation
