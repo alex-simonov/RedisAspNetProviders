@@ -94,7 +94,7 @@ namespace RedisAspNetProviders
             return AddOrGetExisting(entry, utcExpiry, redis, key);
         }
 
-        internal object AddOrGetExisting(object entry, DateTime utcExpiry, IDatabase redis, RedisKey key)
+        protected internal virtual object AddOrGetExisting(object entry, DateTime utcExpiry, IDatabase redis, RedisKey key)
         {
             byte[] newBytes = SerializeObject(entry);
             RedisResult cachedBytes = redis.ScriptEvaluate(

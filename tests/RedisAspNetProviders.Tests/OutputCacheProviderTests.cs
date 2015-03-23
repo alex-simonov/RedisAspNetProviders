@@ -2,9 +2,9 @@
 using System.Runtime.CompilerServices;
 using System.Threading;
 using System.Threading.Tasks;
-using Microsoft.QualityTools.Testing.Fakes;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
-using RedisAspNetProviders.Fakes;
+using Moq;
+using StackExchange.Redis;
 
 namespace RedisAspNetProviders.Tests
 {
@@ -134,25 +134,27 @@ namespace RedisAspNetProviders.Tests
             const int timeout = 5;
             string entryKey = GenerateKey();
 
-            OutputCacheProvider provider = CreateProvider();
-            using (ShimsContext.Create())
+            OutputCacheProvider provider1 = CreateProvider();
             using (var canSetEvent = new AutoResetEvent(false))
             using (var canResumeAddEvent = new AutoResetEvent(false))
             {
-                var adder = new ShimOutputCacheProvider(CreateProvider());
-                adder.AddOrGetExistingObjectDateTimeIDatabaseRedisKey = (entry, expiresAt, redis, key) =>
-                {
-                    canSetEvent.Set();
-                    canResumeAddEvent.WaitOne();
-                    return provider.AddOrGetExisting(entry, expiresAt, redis, key);
-                };
+                var adder = new Mock<OutputCacheProvider>() { CallBase = true };
+                adder.Setup(x => x.AddOrGetExisting(It.IsAny<object>(), It.IsAny<DateTime>(), It.IsAny<IDatabase>(), It.IsAny<RedisKey>()))
+                    .Callback((object entry, DateTime utcExpiry, IDatabase redis, RedisKey key) =>
+                    {
+                        canSetEvent.Set();
+                        canResumeAddEvent.WaitOne();
+                    })
+                    .CallBase();
 
                 Task<object> addTask = Task.Factory.StartNew(
-                    () => adder.Instance.Add(entryKey, OldData, DateTime.UtcNow.AddSeconds(timeout)),
+                    () => {
+                        return adder.Object.Add(entryKey, OldData, DateTime.UtcNow.AddSeconds(timeout));
+                    },
                     TaskCreationOptions.LongRunning);
 
                 canSetEvent.WaitOne();
-                provider.Set(entryKey, NewData, DateTime.UtcNow.AddSeconds(timeout));
+                provider1.Set(entryKey, NewData, DateTime.UtcNow.AddSeconds(timeout));
                 canResumeAddEvent.Set();
 
                 object cachedData = addTask.Result;

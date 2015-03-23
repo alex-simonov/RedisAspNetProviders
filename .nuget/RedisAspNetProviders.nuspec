@@ -23,13 +23,13 @@ v 1.0.0:
         <tags>asp.net AspNet provider redis sessionstate session outputcache cache</tags>
         <dependencies>
             <group targetFramework=".NETFramework4.5">
-                <dependency id="StackExchange.Redis" version="1.0.270" />
+                <dependency id="StackExchange.Redis" version="1.0.414" />
             </group>
             <group targetFramework=".NETFramework4.0">
-                <dependency id="Microsoft.Bcl.Build" version="1.0.14" />
-                <dependency id="Microsoft.Bcl" version="1.1.8" />
+                <dependency id="Microsoft.Bcl.Build" version="1.0.21" />
+                <dependency id="Microsoft.Bcl" version="1.1.10" />
                 <dependency id="Microsoft.Bcl.Async" version="1.0.168" />
-                <dependency id="StackExchange.Redis" version="1.0.270" />
+                <dependency id="StackExchange.Redis" version="1.0.414" />
             </group>
         </dependencies>
     </metadata>

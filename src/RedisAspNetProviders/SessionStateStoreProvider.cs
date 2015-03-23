@@ -5,6 +5,7 @@ using System.Configuration;
 using System.Configuration.Provider;
 using System.Globalization;
 using System.IO;
+using System.Runtime.CompilerServices;
 using System.Web;
 using System.Web.Configuration;
 using System.Web.SessionState;
@@ -89,6 +90,14 @@ namespace RedisAspNetProviders
             return DateTime.UtcNow.Subtract(lockDateTime);
         }
 
+#if DOTNET45
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+#endif
+        protected static HttpStaticObjectsCollection GetSessionStaticObjects(HttpContext context)
+        {
+            return context == null ? new HttpStaticObjectsCollection() : SessionStateUtility.GetSessionStaticObjects(context);
+        }
+
         protected virtual byte[] SerializeSessionState(SessionStateItemCollection sessionStateItems)
         {
             using (var ms = new MemoryStream())
@@ -113,7 +122,7 @@ namespace RedisAspNetProviders
         {
             return new SessionStateStoreData(
                 new SessionStateItemCollection(),
-                SessionStateUtility.GetSessionStaticObjects(context),
+                GetSessionStaticObjects(context),
                 timeout);
         }
 
@@ -224,7 +233,7 @@ namespace RedisAspNetProviders
                     }
                     return new SessionStateStoreData(
                         DeserializeSessionState(result[0]),
-                        SessionStateUtility.GetSessionStaticObjects(context),
+                        GetSessionStaticObjects(context),
                         (int)SessionTimeout.TotalMinutes);
 
                 default:
