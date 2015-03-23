@@ -1,4 +1,4 @@
-RedisAspNetProviders
+RedisAspNetProviders [![Build status](https://ci.appveyor.com/api/projects/status/15muiqcj5gnoaorb?svg=true)](https://ci.appveyor.com/project/alex-simonov/redisaspnetproviders)
 ====================
 
 Redis backed ASP.NET providers written in C# using [`StackExchange.Redis`](https://github.com/StackExchange/StackExchange.Redis). Includes the following providers:
