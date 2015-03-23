@@ -12,7 +12,7 @@ build:
 before_build:
 - nuget restore RedisAspNetProviders.sln
 test:
-  assemblies: '*\*.Tests.dll'
+  assemblies: '**\*.Tests.dll'
 before_test:
 - cd packages\Redis-64.2.8.19\
 - .\redis-server.exe --service-install
