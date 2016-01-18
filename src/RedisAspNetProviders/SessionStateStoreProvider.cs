@@ -134,9 +134,11 @@ namespace RedisAspNetProviders
             IDatabase redis = storageDetails.Item1;
             RedisKey key = storageDetails.Item2;
 
+			// HMSET <key>, data, <session data>, init, 1, timeout, <timeout>
+			// EXPIRE <key>, <timeout>
             redis.ScriptEvaluate(
                 @"redis.call('DEL', KEYS[1])
-                  redis.call('HMSET', KEYS[1], ARGV[2], ARGV[3], ARGV[4], ARGV[5])
+                  redis.call('HMSET', KEYS[1], ARGV[2], ARGV[3], ARGV[4], ARGV[5], ARGV[6], ARGV[1])
                   redis.call('EXPIRE', KEYS[1], ARGV[1])",
                 new RedisKey[] { key },
                 new RedisValue[]
@@ -145,7 +147,8 @@ namespace RedisAspNetProviders
                     HashFieldsEnum.SessionStateData,
                     sessionStateBytes,
                     HashFieldsEnum.InitializeItemFlag,
-                    1
+                    1,
+					HashFieldsEnum.Timeout
                 });
         }
 
@@ -179,38 +182,44 @@ namespace RedisAspNetProviders
             IDatabase redis = storageDetails.Item1;
             RedisKey key = storageDetails.Item2;
 
-            var arguments = new List<RedisValue>(5)
+            var arguments = new List<RedisValue>(4)
             {
-                (long)SessionTimeout.TotalSeconds,
-                HashFieldsEnum.SessionStateData,
-                HashFieldsEnum.Lock,
-                HashFieldsEnum.InitializeItemFlag
+                HashFieldsEnum.SessionStateData,//1
+                HashFieldsEnum.Lock,//2
+                HashFieldsEnum.InitializeItemFlag,//3
+				HashFieldsEnum.Timeout//4
             };
             if (exclusive)
             {
-                arguments.Add(GenerateNewLockId());
+                arguments.Add(GenerateNewLockId());//6
             }
-
+			// session[1] = sessionstate
+			// session[2] = lock
+			// session[3] = init
+			// session[4] = timeout
             var result = (RedisValue[])redis.ScriptEvaluate(
-                @"redis.call('EXPIRE', KEYS[1], ARGV[1])
-                  local session = redis.call('HMGET', KEYS[1], ARGV[2], ARGV[3], ARGV[4])
+				@"local session = redis.call('HMGET', KEYS[1], ARGV[1], ARGV[2], ARGV[3], ARGV[4])
                   if not session[1] then 
                       return { false }
                   elseif session[2] then
                       return { false, session[2] }
                   end
+                  redis.call('EXPIRE', KEYS[1], session[4])
                   if ARGV[5] ~= nil then
-                      redis.call('HSET', KEYS[1], ARGV[3], ARGV[5])
+                      redis.call('HSET', KEYS[1], ARGV[2], ARGV[5])
                       session[2] = ARGV[5]
                   end
                   local initFlagSet = not not session[3]
                   if initFlagSet then
-                      redis.call('HDEL', KEYS[1], ARGV[4])
+                      redis.call('HDEL', KEYS[1], ARGV[3])
                   end
-                  return { session[1], session[2], initFlagSet }",
+                  return { session[1], session[2], initFlagSet, session[4] }",
                 new RedisKey[] { key },
                 arguments.ToArray());
-
+			//results[0] = sessionstate
+			//results[1] = lock
+			//results[2] = init flag set
+			//results[3] = timeout
             switch (result.Length)
             {
                 case 1: // session is not found
@@ -222,8 +231,21 @@ namespace RedisAspNetProviders
                     lockAge = GetLockAge((string)lockId);
                     return null;
 
-                case 3: // got session. 
-                    if (exclusive)
+				//case 3: // got session. 
+				//	if (exclusive)
+				//	{
+				//		lockId = (string)result[1];
+				//	}
+				//	if ((bool)result[2])
+				//	{
+				//		actions = SessionStateActions.InitializeItem;
+				//	}
+				//	return new SessionStateStoreData(
+				//		DeserializeSessionState(result[0]),
+				//		GetSessionStaticObjects(context),
+				//		(int)SessionTimeout.TotalMinutes);
+				case 4: // got session with a timeout
+					if (exclusive)
                     {
                         lockId = (string)result[1];
                     }
@@ -231,10 +253,15 @@ namespace RedisAspNetProviders
                     {
                         actions = SessionStateActions.InitializeItem;
                     }
+					int timeout = 0;
+					if(!result[3].TryParse(out timeout))
+					{
+						timeout = (int)SessionTimeout.TotalMinutes;
+					}
                     return new SessionStateStoreData(
                         DeserializeSessionState(result[0]),
                         GetSessionStaticObjects(context),
-                        (int)SessionTimeout.TotalMinutes);
+                        timeout/60);
 
                 default:
                     throw new ProviderException("Invalid count of items in result array.");
@@ -290,7 +317,12 @@ namespace RedisAspNetProviders
             IDatabase redis = storageDetails.Item1;
             RedisKey key = storageDetails.Item2;
 
-            redis.KeyExpire(key, SessionTimeout);
+            //redis.KeyExpire(key, SessionTimeout);
+			redis.ScriptEvaluate(
+				@"local timeout = redis.call('HGET', KEYS[1], ARGV[1])
+                  redis.call('EXPIRE', KEYS[1], timeout)",
+				new RedisKey[] { key },
+				new RedisValue[] { HashFieldsEnum.Timeout });
         }
 
         public override void SetAndReleaseItemExclusive(HttpContext context, string id, SessionStateStoreData item,
@@ -304,30 +336,33 @@ namespace RedisAspNetProviders
 
             byte[] sessionStateData = SerializeSessionState((SessionStateItemCollection)item.Items);
 
+			var timeout = TimeSpan.FromMinutes(item.Timeout);
+
             var arguments = new List<RedisValue>(6)
             {
-                HashFieldsEnum.SessionStateData,
-                sessionStateData,
-                (long)SessionTimeout.TotalSeconds,
-                newItem,
-                HashFieldsEnum.Lock,
+                HashFieldsEnum.SessionStateData, //1
+                sessionStateData, //2
+				HashFieldsEnum.Timeout, //3
+                (long)timeout.TotalSeconds, //4
+                newItem, //5
+                HashFieldsEnum.Lock, //6
             };
             if (lockId != null)
             {
-                arguments.Add((string)lockId);
+                arguments.Add((string)lockId); //7
             }
             redis.ScriptEvaluate(
                 @"local canUpdateSession = true
-                  if tonumber(ARGV[4]) == 1 then
+                  if tonumber(ARGV[5]) == 1 then
                       redis.call('DEL', KEYS[1])
-                  elseif ARGV[6] ~= nil and ARGV[6] == redis.call('HGET', KEYS[1], ARGV[5]) then
-                      redis.call('HDEL', KEYS[1], ARGV[5])
+                  elseif ARGV[7] ~= nil and ARGV[7] == redis.call('HGET', KEYS[1], ARGV[6]) then
+                      redis.call('HDEL', KEYS[1], ARGV[6])
                   else
                       canUpdateSession = false
                   end
                   if canUpdateSession then
-                      redis.call('HSET', KEYS[1], ARGV[1], ARGV[2])
-                      redis.call('EXPIRE', KEYS[1], ARGV[3])
+                      redis.call('HMSET', KEYS[1], ARGV[1], ARGV[2], ARGV[3], ARGV[4])
+                      redis.call('EXPIRE', KEYS[1], ARGV[4])
                   end",
                 new RedisKey[] { key },
                 arguments.ToArray());
@@ -348,6 +383,11 @@ namespace RedisAspNetProviders
 
             /// <summary>"lock"</summary>
             public const string Lock = "lock";
+
+			/// <summary>
+			/// "timeout"
+			/// </summary>
+			public const string Timeout = "timeout";
         }
     }
 }
