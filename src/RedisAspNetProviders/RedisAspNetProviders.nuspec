@@ -1,8 +1,8 @@
-﻿<?xml version="1.0" encoding="utf-8"?>
+<?xml version="1.0" encoding="utf-8"?>
 <package xmlns="http://schemas.microsoft.com/packaging/2012/06/nuspec.xsd">
     <metadata>
         <id>RedisAspNetProviders</id>
-        <version>1.0.3</version>
+        <version>1.0.2</version>
         <title>RedisAspNetProviders</title>
         <authors>alex-simonov,nekstrom</authors>
         <owners>alex-simonov,nekstrom</owners>
@@ -11,9 +11,7 @@
         <requireLicenseAcceptance>true</requireLicenseAcceptance>
         <description>Redis backed ASP.NET providers written in C# using StackExchange.Redis. Includes  OutputCacheProvider and SessionStateStoreProvider.</description>
         <summary>Redis backed ASP.NET providers written in C# using StackExchange.Redis. Includes  OutputCacheProvider and SessionStateStoreProvider.</summary>
-        <releaseNotes>v 1.0.3
- - Supports having locks timeout
-v 1.0.2
+        <releaseNotes>v 1.0.2
  - Supports changing the session timeout dynamically
 
 v 1.0.1:
