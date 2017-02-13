@@ -15,7 +15,9 @@ namespace RedisAspNetProviders
 {
     public class SessionStateStoreProvider : SessionStateStoreProviderBase
     {
-        private const string LockStartDateTimeFormat = "dd'-'MM'-'yyyy'T'HH':'mm':'ss'.'fffffff";
+		public override string Name => "RedisAspNetSessionProvider";
+		public override string Description => "Session storage provider that stores session information in Redis.";
+	    private const string LockStartDateTimeFormat = "dd'-'MM'-'yyyy'T'HH':'mm':'ss'.'fffffff";
         private static readonly object s_oneTimeInitLock = new object();
         private static bool s_oneTimeInitCalled;
 
@@ -23,6 +25,7 @@ namespace RedisAspNetProviders
         protected static int DbNumber { get; private set; }
         protected static string KeyPrefix { get; private set; }
         protected static TimeSpan SessionTimeout { get; private set; }
+		protected static TimeSpan? LockTimeout { get; private set; }
 
         public override void Initialize(string name, NameValueCollection config)
         {
@@ -59,8 +62,16 @@ namespace RedisAspNetProviders
                 throw new ConfigurationErrorsException("Can not parse db number.", ex);
             }
             KeyPrefix = config["keyPrefix"] ?? string.Empty;
+	        string lockTimeoutStr = config["maxLockTime"];
+	        if (!string.IsNullOrEmpty(lockTimeoutStr))
+	        {
+		        TimeSpan timeout;
+				if (TimeSpan.TryParse(lockTimeoutStr, out timeout))
+					LockTimeout = timeout;
+	        }
 
-            var sessionStateConfig = (SessionStateSection)WebConfigurationManager.GetSection("system.web/sessionState");
+
+	        var sessionStateConfig = (SessionStateSection)WebConfigurationManager.GetSection("system.web/sessionState");
             SessionTimeout = sessionStateConfig.Timeout;
         }
 
@@ -79,11 +90,11 @@ namespace RedisAspNetProviders
                 DateTime.UtcNow.ToString(LockStartDateTimeFormat, CultureInfo.InvariantCulture));
         }
 
-        protected static TimeSpan GetLockAge(string lockIdString)
+        protected static TimeSpan GetLockAge(string lockId)
         {
-            int lockDateTimeStartIndex = lockIdString.IndexOf('|');
+	        int where = lockId.IndexOf('|');
             DateTime lockDateTime = DateTime.ParseExact(
-                lockIdString.Substring(lockDateTimeStartIndex + 1),
+                lockId.Substring(where+1),
                 LockStartDateTimeFormat,
                 CultureInfo.InvariantCulture,
                 DateTimeStyles.AssumeUniversal | DateTimeStyles.AdjustToUniversal);
@@ -134,9 +145,11 @@ namespace RedisAspNetProviders
             IDatabase redis = storageDetails.Item1;
             RedisKey key = storageDetails.Item2;
 
+			// HMSET <key>, data, <session data>, init, 1, timeout, <timeout>
+			// EXPIRE <key>, <timeout>
             redis.ScriptEvaluate(
                 @"redis.call('DEL', KEYS[1])
-                  redis.call('HMSET', KEYS[1], ARGV[2], ARGV[3], ARGV[4], ARGV[5])
+                  redis.call('HMSET', KEYS[1], ARGV[2], ARGV[3], ARGV[4], ARGV[5], ARGV[6], ARGV[1])
                   redis.call('EXPIRE', KEYS[1], ARGV[1])",
                 new RedisKey[] { key },
                 new RedisValue[]
@@ -145,7 +158,8 @@ namespace RedisAspNetProviders
                     HashFieldsEnum.SessionStateData,
                     sessionStateBytes,
                     HashFieldsEnum.InitializeItemFlag,
-                    1
+                    1,
+					HashFieldsEnum.Timeout
                 });
         }
 
@@ -167,9 +181,53 @@ namespace RedisAspNetProviders
             return GetItem(true, context, id, out locked, out lockAge, out lockId, out actions);
         }
 
-        protected virtual SessionStateStoreData GetItem(bool exclusive, HttpContext context, string id, out bool locked,
+		/// <summary>
+		/// Lua script for trying to get a session
+		/// </summary>
+		private const string FULL_GET_ITEM_SCRIPT =
+			@"
+	local session = redis.call('HMGET', KEYS[1], ARGV[1], ARGV[2], ARGV[3], ARGV[4])
+	if not session[1] then 
+		return { false }
+	elseif session[2] then
+		return { false, session[2] }
+	end
+	redis.call('EXPIRE', KEYS[1], session[4])
+	if ARGV[5] ~= nil then
+		redis.call('HMSET', KEYS[1], ARGV[2], ARGV[5], ARGV[6], ARGV[7])
+		session[2] = ARGV[5]
+	end
+	local initFlagSet = not not session[3]
+	if initFlagSet then
+		redis.call('HDEL', KEYS[1], ARGV[3])
+	end
+	return { session[1], session[2], initFlagSet, session[4] }
+";
+		/// <summary>
+		/// Lua script for getting a session when we don't care if it has a lock.
+		/// </summary>
+		private const string IGNORE_LOCK_GET_ITEM_SCRIPT =
+			@"
+	local session = redis.call('HMGET', KEYS[1], ARGV[1], ARGV[2], ARGV[3], ARGV[4])
+	if not session[1] then 
+		return { false }
+	end
+	redis.call('EXPIRE', KEYS[1], session[4])
+	if ARGV[5] ~= nil then
+		redis.call('HMSET', KEYS[1], ARGV[2], ARGV[5], ARGV[6], ARGV[7])
+		session[2] = ARGV[5]
+	end
+	local initFlagSet = not not session[3]
+	if initFlagSet then
+		redis.call('HDEL', KEYS[1], ARGV[3])
+	end
+	return { session[1], session[2], initFlagSet, session[4] }
+";
+
+		protected virtual SessionStateStoreData GetItem(bool exclusive, HttpContext context, string id, out bool locked,
             out TimeSpan lockAge, out object lockId, out SessionStateActions actions)
         {
+			
             locked = false;
             lockAge = TimeSpan.Zero;
             lockId = null;
@@ -179,69 +237,81 @@ namespace RedisAspNetProviders
             IDatabase redis = storageDetails.Item1;
             RedisKey key = storageDetails.Item2;
 
-            var arguments = new List<RedisValue>(5)
+            var arguments = new List<RedisValue>(4)
             {
-                (long)SessionTimeout.TotalSeconds,
-                HashFieldsEnum.SessionStateData,
-                HashFieldsEnum.Lock,
-                HashFieldsEnum.InitializeItemFlag
+                HashFieldsEnum.SessionStateData,//1
+                HashFieldsEnum.Lock,//2
+                HashFieldsEnum.InitializeItemFlag,//3
+				HashFieldsEnum.Timeout,//4,
             };
             if (exclusive)
             {
-                arguments.Add(GenerateNewLockId());
+                arguments.Add(GenerateNewLockId());//5
+	            arguments.Add(HashFieldsEnum.URL);//6
+	            arguments.Add(BuildLockUrl(context));//7
             }
+			// session[1] = sessionstate
+			// session[2] = lock
+			// session[3] = init
+			// session[4] = timeout
+	        var result = (RedisValue[])redis.ScriptEvaluate(FULL_GET_ITEM_SCRIPT, new RedisKey[] {key}, arguments.ToArray());
+			//results[0] = sessionstate
+			//results[1] = lock
+			//results[2] = init flag set
+			//results[3] = timeout
+	        switch (result.Length)
+	        {
+		        case 1: // session is not found
+			        return null;
 
-            var result = (RedisValue[])redis.ScriptEvaluate(
-                @"redis.call('EXPIRE', KEYS[1], ARGV[1])
-                  local session = redis.call('HMGET', KEYS[1], ARGV[2], ARGV[3], ARGV[4])
-                  if not session[1] then 
-                      return { false }
-                  elseif session[2] then
-                      return { false, session[2] }
-                  end
-                  if ARGV[5] ~= nil then
-                      redis.call('HSET', KEYS[1], ARGV[3], ARGV[5])
-                      session[2] = ARGV[5]
-                  end
-                  local initFlagSet = not not session[3]
-                  if initFlagSet then
-                      redis.call('HDEL', KEYS[1], ARGV[4])
-                  end
-                  return { session[1], session[2], initFlagSet }",
-                new RedisKey[] { key },
-                arguments.ToArray());
+		        case 2: // session is locked by someone else
+			        {
+				        lockAge = GetLockAge(result[1]);
+				        if (LockTimeout.HasValue && lockAge > LockTimeout.Value)
+				        {
+							// Lock timed out so we are going to blow it away by running the same
+							// script again except without the lock check.
+					        result =
+							        (RedisValue[])redis.ScriptEvaluate(IGNORE_LOCK_GET_ITEM_SCRIPT, new RedisKey[] {key}, arguments.ToArray());
+					        lockAge = TimeSpan.Zero;
+				        }
+				        else
+				        {
+					        locked = true;
+					        lockId = result[1];
+					        return null;
+				        }
+			        }
+			        break;
+	        }
 
-            switch (result.Length)
-            {
-                case 1: // session is not found
-                    return null;
-
-                case 2: // session is locked by someone else
-                    locked = true;
-                    lockId = (string)result[1];
-                    lockAge = GetLockAge((string)lockId);
-                    return null;
-
-                case 3: // got session. 
-                    if (exclusive)
-                    {
-                        lockId = (string)result[1];
-                    }
-                    if ((bool)result[2])
-                    {
-                        actions = SessionStateActions.InitializeItem;
-                    }
-                    return new SessionStateStoreData(
-                        DeserializeSessionState(result[0]),
-                        GetSessionStaticObjects(context),
-                        (int)SessionTimeout.TotalMinutes);
-
-                default:
-                    throw new ProviderException("Invalid count of items in result array.");
-            }
+	        if (result.Length != 4)
+		        throw new ProviderException("Invalid count of items in result array.");
+			
+			// got session with a timeout
+			if (exclusive)
+	        {
+		        lockId = (string)result[1];
+	        }
+	        if ((bool)result[2])
+	        {
+		        actions = SessionStateActions.InitializeItem;
+	        }
+	        int timeout = 0;
+	        if(!result[3].TryParse(out timeout))
+	        {
+		        timeout = (int)SessionTimeout.TotalMinutes;
+	        }
+	        return new SessionStateStoreData(DeserializeSessionState(result[0]), GetSessionStaticObjects(context),
+	                                         timeout / 60);
         }
 
-        public override void InitializeRequest(HttpContext context)
+	    private RedisValue BuildLockUrl(HttpContext context)
+	    {
+		    return $"{context.Server.MachineName}{context.Request.Path}";
+	    }
+
+	    public override void InitializeRequest(HttpContext context)
         {}
 
         public override void ReleaseItemExclusive(HttpContext context, string id, object lockId)
@@ -253,20 +323,22 @@ namespace RedisAspNetProviders
             redis.ScriptEvaluate(
                 @"redis.call('EXPIRE', KEYS[1], ARGV[1])
                   if redis.call('HGET', KEYS[1], ARGV[2]) == ARGV[3] then
-                      redis.call('HDEL', KEYS[1], ARGV[2])
+                      redis.call('HDEL', KEYS[1], ARGV[2], ARGV[4])
                   end",
                 new RedisKey[] { key },
                 new RedisValue[]
                 {
-                    (long)SessionTimeout.TotalSeconds,
-                    HashFieldsEnum.Lock,
-                    (string)lockId
+                    (long)SessionTimeout.TotalSeconds, //1
+                    HashFieldsEnum.Lock, //2
+                    (string)lockId, //3
+					HashFieldsEnum.URL //4
                 });
         }
 
         public override void RemoveItem(HttpContext context, string id, object lockId, SessionStateStoreData item)
         {
-            if (lockId == null) return;
+            if (string.IsNullOrEmpty((string)lockId))
+				return;
             Tuple<IDatabase, RedisKey> storageDetails = GetSessionStateStorageDetails(context, id);
             IDatabase redis = storageDetails.Item1;
             RedisKey key = storageDetails.Item2;
@@ -279,8 +351,8 @@ namespace RedisAspNetProviders
                 new RedisKey[] { key },
                 new RedisValue[]
                 {
-                    HashFieldsEnum.Lock,
-                    (string)lockId
+                    HashFieldsEnum.Lock, // 1
+                    (string)lockId, //2
                 });
         }
 
@@ -290,7 +362,12 @@ namespace RedisAspNetProviders
             IDatabase redis = storageDetails.Item1;
             RedisKey key = storageDetails.Item2;
 
-            redis.KeyExpire(key, SessionTimeout);
+            //redis.KeyExpire(key, SessionTimeout);
+			redis.ScriptEvaluate(
+				@"local timeout = redis.call('HGET', KEYS[1], ARGV[1])
+                  redis.call('EXPIRE', KEYS[1], timeout)",
+				new RedisKey[] { key },
+				new RedisValue[] { HashFieldsEnum.Timeout });
         }
 
         public override void SetAndReleaseItemExclusive(HttpContext context, string id, SessionStateStoreData item,
@@ -304,30 +381,34 @@ namespace RedisAspNetProviders
 
             byte[] sessionStateData = SerializeSessionState((SessionStateItemCollection)item.Items);
 
+			var timeout = TimeSpan.FromMinutes(item.Timeout);
+
             var arguments = new List<RedisValue>(6)
             {
-                HashFieldsEnum.SessionStateData,
-                sessionStateData,
-                (long)SessionTimeout.TotalSeconds,
-                newItem,
-                HashFieldsEnum.Lock,
+                HashFieldsEnum.SessionStateData, //1
+                sessionStateData, //2
+				HashFieldsEnum.Timeout, //3
+                (long)timeout.TotalSeconds, //4
+                newItem, //5
+                HashFieldsEnum.Lock, //6
             };
-            if (lockId != null)
+            if (!string.IsNullOrEmpty((string)lockId))
             {
-                arguments.Add((string)lockId);
+                arguments.Add((string)lockId); //7
+	            arguments.Add(HashFieldsEnum.URL); //8
             }
             redis.ScriptEvaluate(
                 @"local canUpdateSession = true
-                  if tonumber(ARGV[4]) == 1 then
+                  if tonumber(ARGV[5]) == 1 then
                       redis.call('DEL', KEYS[1])
-                  elseif ARGV[6] ~= nil and ARGV[6] == redis.call('HGET', KEYS[1], ARGV[5]) then
-                      redis.call('HDEL', KEYS[1], ARGV[5])
+                  elseif ARGV[7] ~= nil and ARGV[7] == redis.call('HGET', KEYS[1], ARGV[6]) then
+                      redis.call('HDEL', KEYS[1], ARGV[6], ARGV[8])
                   else
                       canUpdateSession = false
                   end
                   if canUpdateSession then
-                      redis.call('HSET', KEYS[1], ARGV[1], ARGV[2])
-                      redis.call('EXPIRE', KEYS[1], ARGV[3])
+                      redis.call('HMSET', KEYS[1], ARGV[1], ARGV[2], ARGV[3], ARGV[4])
+                      redis.call('EXPIRE', KEYS[1], ARGV[4])
                   end",
                 new RedisKey[] { key },
                 arguments.ToArray());
@@ -348,6 +429,16 @@ namespace RedisAspNetProviders
 
             /// <summary>"lock"</summary>
             public const string Lock = "lock";
+
+			/// <summary>
+			/// "timeout"
+			/// </summary>
+			public const string Timeout = "timeout";
+
+			/// <summary>
+			/// Hash object key for request URL
+			/// </summary>
+	        public const string URL = "currenturl";
         }
     }
 }
